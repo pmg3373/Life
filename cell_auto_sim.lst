@@ -1,0 +1,888 @@
+   1 0000               .data
+   2 0000               # CONSTANTS
+   3 0000               #
+   4 0000               # syscall codes
+   5 0000               PRINT_INT = 	1
+   6 0000               PRINT_STRING = 	4
+   7 0000               READ_INT = 		5
+   8 0000               MEM_ALLOC = 	9
+   9 0000               EXIT = 			10
+  10 0000               PRINT_CHAR = 	11
+  11 0000               
+  12 0000               MAX_RULE = 255
+  13 0000               MAX_GENS = 25
+  14 0000               MAX_WIDTH = 70
+  15 0000               
+  16 0000               	header_1: 
+  17 0000 2A2A2A2A				.asciiz "*****************************************\n"
+          2A2A2A2A
+          2A2A2A2A
+          2A2A2A2A
+          2A2A2A2A
+          2A2A2A2A
+  18 002b               	header_2:
+  19 002b 2A2A2020				.asciiz "**     Cellular Automata Simulator     **\n"
+          20202043
+          656C6C75
+          6C617220
+          4175746F
+          6D617461
+  20 0056               	header_3:
+  21 0056 2A2A2A2A				.asciiz "*****************************************\n"
+          2A2A2A2A
+          2A2A2A2A
+          2A2A2A2A
+          2A2A2A2A
+          2A2A2A2A
+  22 0081               	header_4:
+  23 0081 0A00    				.asciiz	"\n"
+  24 0083               
+  25 0083               	invalid_rule:
+  26 0083 496E7661				.asciiz "Invalid rule number, cell-auto-sim terminating\n"
+          6C696420
+          72756C65
+          206E756D
+          6265722C
+          2063656C
+  27 00b3               	invalid_num_gen:
+  28 00b3 496E7661				.asciiz	"Invalid generation number, cell-auto-sim terminating\n"
+          6C696420
+          67656E65
+          72617469
+          6F6E206E
+          756D6265
+  29 00e9               	invalid_row_size:
+  30 00e9 496E7661				.asciiz "Invalid row size, cell-auto-sim terminating\n"
+          6C696420
+          726F7720
+          73697A65
+          2C206365
+          6C6C2D61
+  31 0116               	illegal_input:
+  32 0116 496C6C65				.asciiz "Illegal input value, cell-auto-sim terminating\n"
+          67616C20
+          696E7075
+          74207661
+          6C75652C
+          2063656C
+  33 0146               	rule_banner:
+  34 0146 52756C65				.asciiz "Rule "
+          2000    
+  35 014c               	life_driver_arguments:
+  36 014c 00000000				.word 0
+  37 0150 00000000				.word 0
+  38 0154 00000000				.word 0
+  39 0158 00000000				.space 70
+          00000000
+          00000000
+          00000000
+          00000000
+          00000000
+  40 019e               	life_driver_prev_step:
+  41 019e 00000000				.space 70
+          00000000
+          00000000
+          00000000
+          00000000
+          00000000
+  42 01e4               	life_driver_current_step:
+  43 01e4 00000000				.space 70
+          00000000
+          00000000
+          00000000
+          00000000
+          00000000
+  44 022a               	life_step_current_step:
+  45 022a 00000000				.space 70
+          00000000
+          00000000
+          00000000
+          00000000
+          00000000
+  46 0270               	life_step_prev_step:
+  47 0270 00000000				.space 70
+          00000000
+          00000000
+          00000000
+          00000000
+          00000000
+  48 02b6               	
+  49 02b6               	
+  50 0000               .text
+  51 0000               .align 2
+  52 0000               
+  53 0000               .globl main
+  54 0000               
+  55 0000               
+  56 0000               #
+  57 0000               # Name:		MAIN PROGRAM
+  58 0000               #
+  59 0000               # Description:	Main logic for the program.
+  60 0000               #
+  61 0000               #	This program runs a 2d conways game of life. The first number is the
+  62 0000               #	rule number. The second is the number of generations to simulate. The third
+  63 0000               #	is the width of each row. Then a number of ones and zeros equal to the row
+  64 0000               #	width. This is the initial row.
+  65 0000               #
+  66 0000               
+  67 0000               main:
+  68 0000 23BDFFE4		addi	$sp, $sp, -28				#Func Setup
+  69 0004 AFBF0018		sw	$ra, 24($sp)	
+  70 0008 AFB50014		sw	$s5, 20($sp)
+  71 000c AFB40010		sw	$s4, 16($sp)
+  72 0010 AFB3000C		sw	$s3, 12($sp)
+  73 0014 AFB20008		sw	$s2, 8($sp)
+  74 0018 AFB10004		sw	$s1, 4($sp)
+  75 001c AFB00000		sw	$s0, 0($sp)
+  76 0020               	
+  77 0020 20020005		addi	$v0, $zero, READ_INT
+  78 0024 200800FF		addi	$t0, $zero, MAX_RULE
+  79 0028 0000000C		syscall
+  80 002c 0040482A		slt	$t1, $v0, $zero
+  81 0030 0102502A		slt	$t2, $t0, $v0
+  82 0034 012A5820		add	$t3, $t1, $t2
+  83 0038 11600006		beq	$t3, $zero, main_rule_good
+  84 003c 3C040000		la	$a0, invalid_rule
+     0040 34840000
+  85 0044 20020004		addi	$v0, $zero, PRINT_STRING
+  86 0048 0000000C		syscall
+  87 004c 2002000A		addi	$v0, $zero, EXIT
+  88 0050 0000000C		syscall
+  89 0054               main_rule_good:
+  90 0054 20500000		addi	$s0, $v0, 0
+  91 0058               	
+  92 0058               	
+  93 0058 20020005		addi	$v0, $zero, READ_INT
+  94 005c 20080019		addi	$t0, $zero, MAX_GENS
+  95 0060 0000000C		syscall
+  96 0064 0040482A		slt	$t1, $v0, $zero
+  97 0068 0102502A		slt	$t2, $t0, $v0
+  98 006c 012A5820		add	$t3, $t1, $t2
+  99 0070 11600006		beq	$t3, $zero, main_gens_good
+ 100 0074 3C040000		la	$a0, invalid_num_gen
+     0078 34840000
+ 101 007c 20020004		addi	$v0, $zero, PRINT_STRING
+ 102 0080 0000000C		syscall
+ 103 0084 2002000A		addi	$v0, $zero, EXIT
+ 104 0088 0000000C		syscall
+ 105 008c               main_gens_good:
+ 106 008c 20510000		addi	$s1, $v0, 0
+ 107 0090               
+ 108 0090               	
+ 109 0090 20020005		addi	$v0, $zero, READ_INT
+ 110 0094 20080046		addi	$t0, $zero, MAX_WIDTH
+ 111 0098 0000000C		syscall
+ 112 009c 0040482A		slt	$t1, $v0, $zero
+ 113 00a0 0102502A		slt	$t2, $t0, $v0
+ 114 00a4 012A5820		add	$t3, $t1, $t2
+ 115 00a8 11600006		beq	$t3, $zero, main_rows_good
+ 116 00ac 3C040000		la	$a0, invalid_row_size
+     00b0 34840000
+ 117 00b4 20020004		addi	$v0, $zero, PRINT_STRING
+ 118 00b8 0000000C		syscall
+ 119 00bc 2002000A		addi	$v0, $zero, EXIT
+ 120 00c0 0000000C		syscall
+ 121 00c4               main_rows_good:
+ 122 00c4 20520000		addi	$s2, $v0, 0
+ 123 00c8               	
+ 124 00c8 3C130000		la	$s3, life_driver_arguments
+     00cc 36730000
+ 125 00d0 AE700000		sw	$s0, 0($s3)
+ 126 00d4 AE710004		sw	$s1, 4($s3)
+ 127 00d8 AE720008		sw	$s2, 8($s3)
+ 128 00dc               	
+ 129 00dc 20080000		addi	$t0, $zero, 0						#loop counter
+ 130 00e0 20090001		addi	$t1, $zero, 1						#constant 1
+ 131 00e4 226A000C		addi	$t2, $s3, 12						#write location of bytes
+ 132 00e8               main_read_values_loop_begin:
+ 133 00e8 20020005		addi	$v0, $zero, READ_INT
+ 134 00ec 0000000C		syscall
+ 135 00f0 10400007		beq	$v0, $zero, read_values_valid
+ 136 00f4 10490006		beq	$v0, $t1, read_values_valid
+ 137 00f8 3C040000		la	$a0, illegal_input
+     00fc 34840000
+ 138 0100 20020004		addi	$v0, $zero, PRINT_STRING
+ 139 0104 0000000C		syscall
+ 140 0108 2002000A		addi	$v0, $zero, EXIT
+ 141 010c 0000000C		syscall
+ 142 0110               read_values_valid:
+ 143 0110 A1420000		sb	$v0, 0($t2)
+ 144 0114 214A0001		addi	$t2, $t2, 1
+ 145 0118 21080001		addi	$t0, $t0, 1
+ 146 011c 11120001		beq	$t0, $s2, main_read_values_loop_end
+ 147 0120 0800003A		j main_read_values_loop_begin
+ 148 0124               	
+ 149 0124               main_read_values_loop_end:
+ 150 0124 22440000		addi	$a0, $s2, 0
+ 151 0128 22050000		addi	$a1, $s0, 0
+ 152 012c 0C000089		jal	life_print_header
+ 153 0130               	
+ 154 0130 22640000		addi	$a0, $s3, 0
+ 155 0134 0C000122		jal	life_driver
+ 156 0138               	
+ 157 0138 22440000		addi	$a0, $s2, 0
+ 158 013c 0C0000C3		jal	life_print_scale
+ 159 0140               	
+ 160 0140 8FBF0018		lw 	$ra, 24($sp)			#Func Tear Down
+ 161 0144 8FB50014		lw	$s5, 20($sp)
+ 162 0148 8FB40010		lw	$s4, 16($sp)
+ 163 014c 8FB3000C		lw	$s3, 12($sp)
+ 164 0150 8FB20008		lw	$s2, 8($sp)
+ 165 0154 8FB10004		lw 	$s1, 4($sp)
+ 166 0158 8FB00000		lw 	$s0, 0($sp)
+ 167 015c 23BD001C		addi 	$sp, $sp, 28   	
+ 168 0160 03E00008		jr 	$ra	
+ 169 0164               
+ 170 0164               
+ 171 0164               # 
+ 172 0164               # Name:		life_print_line
+ 173 0164               #
+ 174 0164               # Description:	Prints one line of the life game
+ 175 0164               #
+ 176 0164               # Arguments:	
+ 177 0164               #				a0 Address of the generation line
+ 178 0164               #				a1 The generation number
+ 179 0164               #				a2 Width of the board
+ 180 0164               # Returns:	None
+ 181 0164               #
+ 182 0164               life_print_line:
+ 183 0164 23BDFFE4		addi	$sp, $sp, -28				#Func Setup
+ 184 0168 AFBF0018		sw	$ra, 24($sp)	
+ 185 016c AFB50014		sw	$s5, 20($sp)
+ 186 0170 AFB40010		sw	$s4, 16($sp)
+ 187 0174 AFB3000C		sw	$s3, 12($sp)
+ 188 0178 AFB20008		sw	$s2, 8($sp)
+ 189 017c AFB10004		sw	$s1, 4($sp)
+ 190 0180 AFB00000		sw	$s0, 0($sp)
+ 191 0184               	
+ 192 0184 20900000		addi	$s0, $a0, 0
+ 193 0188 20B10000		addi	$s1, $a1, 0
+ 194 018c 20D20000		addi	$s2, $a2, 0
+ 195 0190 2A29000A		slti	$t1, $s1, 10
+ 196 0194 200A0000		addi	$t2, $zero, 0
+ 197 0198 1120000A		beq	$t1, $zero, life_print_line_gen_no_space
+ 198 019c               	
+ 199 019c 20040020		addi	$a0, $zero, 32				#(sp)
+ 200 01a0 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 201 01a4 0000000C		syscall	
+ 202 01a8 22240000		addi	$a0, $s1, 0
+ 203 01ac 20020001		addi	$v0, $zero, PRINT_INT
+ 204 01b0 0000000C		syscall
+ 205 01b4 20040020		addi	$a0, $zero, 32				#(sp)
+ 206 01b8 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 207 01bc 0000000C		syscall	
+ 208 01c0 08000077		j	life_print_line_loop_begin
+ 209 01c4               	
+ 210 01c4               life_print_line_gen_no_space:
+ 211 01c4 22240000		addi	$a0, $s1, 0
+ 212 01c8 20020001		addi	$v0, $zero, PRINT_INT
+ 213 01cc 0000000C		syscall
+ 214 01d0 20040020		addi	$a0, $zero, 32				#(sp)
+ 215 01d4 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 216 01d8 0000000C		syscall	
+ 217 01dc               	
+ 218 01dc               life_print_line_loop_begin:
+ 219 01dc 020A4020		add	$t0, $s0, $t2
+ 220 01e0 81040000		lb	$a0, 0($t0)
+ 221 01e4 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 222 01e8 0000000C		syscall
+ 223 01ec 214A0001		addi	$t2, $t2, 1
+ 224 01f0 1552FFFA		bne	$t2, $s2, life_print_line_loop_begin
+ 225 01f4               	
+ 226 01f4 2004000A		addi	$a0, $zero, 10				#(nl)
+ 227 01f8 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 228 01fc 0000000C		syscall
+ 229 0200               	
+ 230 0200 8FBF0018		lw 	$ra, 24($sp)			#Func Tear Down
+ 231 0204 8FB50014		lw	$s5, 20($sp)
+ 232 0208 8FB40010		lw	$s4, 16($sp)
+ 233 020c 8FB3000C		lw	$s3, 12($sp)
+ 234 0210 8FB20008		lw	$s2, 8($sp)
+ 235 0214 8FB10004		lw 	$s1, 4($sp)
+ 236 0218 8FB00000		lw 	$s0, 0($sp)
+ 237 021c 23BD001C		addi 	$sp, $sp, 28   	
+ 238 0220 03E00008		jr 	$ra
+ 239 0224               	
+ 240 0224               # 
+ 241 0224               # Name:		life_print_header
+ 242 0224               #
+ 243 0224               # Description:	Prints the results of the life generations
+ 244 0224               #
+ 245 0224               # Arguments:	
+ 246 0224               #				a0: Width of the board
+ 247 0224               #				a1: Rule Number
+ 248 0224               # Returns:	None
+ 249 0224               #
+ 250 0224               life_print_header:
+ 251 0224 23BDFFE4		addi	$sp, $sp, -28				#Func Setup
+ 252 0228 AFBF0018		sw	$ra, 24($sp)	
+ 253 022c AFB50014		sw	$s5, 20($sp)
+ 254 0230 AFB40010		sw	$s4, 16($sp)
+ 255 0234 AFB3000C		sw	$s3, 12($sp)
+ 256 0238 AFB20008		sw	$s2, 8($sp)
+ 257 023c AFB10004		sw	$s1, 4($sp)
+ 258 0240 AFB00000		sw	$s0, 0($sp)
+ 259 0244               	
+ 260 0244 20900000		addi	$s0, $a0, 0						#Width of the board
+ 261 0248 20B10000		addi	$s1, $a1, 0						#Rule Number
+ 262 024c               	
+ 263 024c 3C040000		la	$a0, header_1
+     0250 34840000
+ 264 0254 20020004		addi	$v0, $zero, PRINT_STRING
+ 265 0258 0000000C		syscall
+ 266 025c 3C040000		la	$a0, header_2
+     0260 34840000
+ 267 0264 20020004		addi	$v0, $zero, PRINT_STRING
+ 268 0268 0000000C		syscall
+ 269 026c 3C040000		la	$a0, header_3
+     0270 34840000
+ 270 0274 20020004		addi	$v0, $zero, PRINT_STRING
+ 271 0278 0000000C		syscall
+ 272 027c 3C040000		la	$a0, header_4
+     0280 34840000
+ 273 0284 20020004		addi	$v0, $zero, PRINT_STRING
+ 274 0288 0000000C		syscall
+ 275 028c               	
+ 276 028c               	
+ 277 028c 3C040000		la	$a0, rule_banner
+     0290 34840000
+ 278 0294 20020004		addi	$v0, $zero, PRINT_STRING		#Rule(sp)
+ 279 0298 0000000C		syscall
+ 280 029c 22240000		addi	$a0, $s1, 0
+ 281 02a0 20020001		addi	$v0, $zero, PRINT_INT
+ 282 02a4 0000000C		syscall
+ 283 02a8 20040020		addi	$a0, $zero, 32				#(sp)
+ 284 02ac 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 285 02b0 0000000C		syscall	
+ 286 02b4 20040028		addi	$a0, $zero, 40				#(
+ 287 02b8 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 288 02bc 0000000C		syscall
+ 289 02c0               	
+ 290 02c0 22240000		addi	$a0, $s1, 0
+ 291 02c4 0C0000FC		jal	print_int_as_bin
+ 292 02c8               	
+ 293 02c8 20040029		addi	$a0, $zero, 41				#)
+ 294 02cc 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 295 02d0 0000000C		syscall
+ 296 02d4 2004000A		addi	$a0, $zero, 10				#(nl)
+ 297 02d8 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 298 02dc 0000000C		syscall
+ 299 02e0               	
+ 300 02e0 22040000		addi	$a0, $s0, 0
+ 301 02e4 0C0000C3		jal life_print_scale
+ 302 02e8               	
+ 303 02e8 8FBF0018		lw 	$ra, 24($sp)			#Func Tear Down
+ 304 02ec 8FB50014		lw	$s5, 20($sp)
+ 305 02f0 8FB40010		lw	$s4, 16($sp)
+ 306 02f4 8FB3000C		lw	$s3, 12($sp)
+ 307 02f8 8FB20008		lw	$s2, 8($sp)
+ 308 02fc 8FB10004		lw 	$s1, 4($sp)
+ 309 0300 8FB00000		lw 	$s0, 0($sp)
+ 310 0304 23BD001C		addi 	$sp, $sp, 28   	
+ 311 0308 03E00008		jr 	$ra	
+ 312 030c               
+ 313 030c               	
+ 314 030c               
+ 315 030c               # 
+ 316 030c               # Name:		life_print_scale
+ 317 030c               #
+ 318 030c               # Description:	Prints out the scale
+ 319 030c               #
+ 320 030c               # Arguments:	a0 width of the board
+ 321 030c               # Returns:	none
+ 322 030c               #
+ 323 030c               life_print_scale:
+ 324 030c 23BDFFE4		addi	$sp, $sp, -28				#Func Setup
+ 325 0310 AFBF0018		sw	$ra, 24($sp)	
+ 326 0314 AFB50014		sw	$s5, 20($sp)
+ 327 0318 AFB40010		sw	$s4, 16($sp)
+ 328 031c AFB3000C		sw	$s3, 12($sp)
+ 329 0320 AFB20008		sw	$s2, 8($sp)
+ 330 0324 AFB10004		sw	$s1, 4($sp)
+ 331 0328 AFB00000		sw	$s0, 0($sp)
+ 332 032c               	
+ 333 032c 20080000		addi	$t0, $zero, 0
+ 334 0330 20090000		addi	$t1, $zero, 0
+ 335 0334 200A0004		addi	$t2, $zero, 4
+ 336 0338 200B0009		addi	$t3, $zero, 9
+ 337 033c 20900000		addi	$s0, $a0, 0
+ 338 0340               	
+ 339 0340 20040020		addi	$a0, $zero, 32				#(sp)
+ 340 0344 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 341 0348 0000000C		syscall
+ 342 034c 20040020		addi	$a0, $zero, 32				#(sp)
+ 343 0350 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 344 0354 0000000C		syscall
+ 345 0358 20040020		addi	$a0, $zero, 32				#(sp)
+ 346 035c 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 347 0360 0000000C		syscall
+ 348 0364               	
+ 349 0364               life_print_scale_begin_loop:
+ 350 0364 112A000F		beq	$t1, $t2, life_print_scale_plus
+ 351 0368 112B0007		beq	$t1, $t3, life_print_scale_zero
+ 352 036c               	
+ 353 036c 2004002D		addi	$a0, $zero, 45				#-
+ 354 0370 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 355 0374 0000000C		syscall
+ 356 0378 21080001		addi	$t0, $t0, 1
+ 357 037c 21290001		addi	$t1, $t1, 1
+ 358 0380 1110000F		beq	$t0, $s0, life_print_scale_done
+ 359 0384 080000D9		j	life_print_scale_begin_loop
+ 360 0388               life_print_scale_zero:
+ 361 0388 20040030		addi	$a0, $zero, 48				#0
+ 362 038c 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 363 0390 0000000C		syscall
+ 364 0394 21080001		addi	$t0, $t0, 1
+ 365 0398 20090000		addi	$t1, $zero, 0
+ 366 039c 11100008		beq	$t0, $s0, life_print_scale_done
+ 367 03a0 080000D9		j	life_print_scale_begin_loop
+ 368 03a4               	
+ 369 03a4               life_print_scale_plus:
+ 370 03a4 2004002B		addi	$a0, $zero, 43				#+
+ 371 03a8 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 372 03ac 0000000C		syscall
+ 373 03b0 21080001		addi	$t0, $t0, 1
+ 374 03b4 21290001		addi	$t1, $t1, 1
+ 375 03b8 11100001		beq	$t0, $s0, life_print_scale_done
+ 376 03bc 080000D9		j	life_print_scale_begin_loop
+ 377 03c0               	
+ 378 03c0               life_print_scale_done:
+ 379 03c0 2004000A		addi	$a0, $zero, 10				#(nl)
+ 380 03c4 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 381 03c8 0000000C		syscall
+ 382 03cc               	
+ 383 03cc 8FBF0018		lw 	$ra, 24($sp)			#Func Tear Down
+ 384 03d0 8FB50014		lw	$s5, 20($sp)
+ 385 03d4 8FB40010		lw	$s4, 16($sp)
+ 386 03d8 8FB3000C		lw	$s3, 12($sp)
+ 387 03dc 8FB20008		lw	$s2, 8($sp)
+ 388 03e0 8FB10004		lw 	$s1, 4($sp)
+ 389 03e4 8FB00000		lw 	$s0, 0($sp)
+ 390 03e8 23BD001C		addi 	$sp, $sp, 28   	
+ 391 03ec 03E00008		jr 	$ra	
+ 392 03f0               	
+ 393 03f0               # 
+ 394 03f0               # Name:		print_int_as_bin
+ 395 03f0               #
+ 396 03f0               # Description:	Prints an int in binary
+ 397 03f0               #
+ 398 03f0               # Arguments:	a0 Integer to print
+ 399 03f0               # Returns:	None
+ 400 03f0               #
+ 401 03f0               print_int_as_bin:
+ 402 03f0 23BDFFE4		addi	$sp, $sp, -28				#Func Setup
+ 403 03f4 AFBF0018		sw	$ra, 24($sp)	
+ 404 03f8 AFB50014		sw	$s5, 20($sp)
+ 405 03fc AFB40010		sw	$s4, 16($sp)
+ 406 0400 AFB3000C		sw	$s3, 12($sp)
+ 407 0404 AFB20008		sw	$s2, 8($sp)
+ 408 0408 AFB10004		sw	$s1, 4($sp)
+ 409 040c AFB00000		sw	$s0, 0($sp)
+ 410 0410               	
+ 411 0410 20900000		addi	$s0, $a0, 0
+ 412 0414 20080001		addi	$t0, $zero, 1
+ 413 0418 20090020		addi	$t1, $zero, 32
+ 414 041c 200A0000		addi	$t2, $zero, 0
+ 415 0420 000847C0		sll	$t0, 31
+ 416 0424               print_int_as_bin_loop_begin:
+ 417 0424 01105824		and	$t3, $t0, $s0
+ 418 0428 11600007		beq	$t3, $zero, print_int_as_bin_zero
+ 419 042c 20040031		addi	$a0, $zero, 49				#1
+ 420 0430 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 421 0434 0000000C		syscall
+ 422 0438 00108040		sll	$s0, $s0, 1
+ 423 043c 214A0001		addi	$t2, $t2, 1
+ 424 0440 11490008		beq	$t2, $t1, print_int_as_bin_done
+ 425 0444 08000109		j print_int_as_bin_loop_begin
+ 426 0448               print_int_as_bin_zero:
+ 427 0448 20040030		addi	$a0, $zero, 48				#0
+ 428 044c 2002000B		addi	$v0, $zero, PRINT_CHAR
+ 429 0450 0000000C		syscall
+ 430 0454 00108040		sll	$s0, $s0, 1
+ 431 0458 214A0001		addi	$t2, $t2, 1
+ 432 045c 11490001		beq	$t2, $t1, print_int_as_bin_done
+ 433 0460 08000109		j print_int_as_bin_loop_begin
+ 434 0464               	
+ 435 0464               print_int_as_bin_done:
+ 436 0464 8FBF0018		lw 	$ra, 24($sp)			#Func Tear Down
+ 437 0468 8FB50014		lw	$s5, 20($sp)
+ 438 046c 8FB40010		lw	$s4, 16($sp)
+ 439 0470 8FB3000C		lw	$s3, 12($sp)
+ 440 0474 8FB20008		lw	$s2, 8($sp)
+ 441 0478 8FB10004		lw 	$s1, 4($sp)
+ 442 047c 8FB00000		lw 	$s0, 0($sp)
+ 443 0480 23BD001C		addi 	$sp, $sp, 28   	
+ 444 0484 03E00008		jr 	$ra	
+ 445 0488               	
+ 446 0488               	
+ 447 0488               
+ 448 0488               # 
+ 449 0488               # Name:		life_driver
+ 450 0488               #
+ 451 0488               # Description:	Prints out each line of the generation sequence
+ 452 0488               #
+ 453 0488               # Arguments:	a0 Address of arguement memory block
+ 454 0488               #				Format:
+ 455 0488               #				Word: Rule Number
+ 456 0488               #				Word: Number of generations
+ 457 0488               #				Word: Width of the board
+ 458 0488               #				Bytes (1-70): Initial line, each byte is either zero or one
+ 459 0488               # Returns:	None
+ 460 0488               #
+ 461 0488               life_driver:
+ 462 0488 23BDFFDC		addi	$sp, $sp, -36				#Func Setup
+ 463 048c AFBF0020		sw	$ra, 32($sp)	
+ 464 0490 AFB7001C		sw	$s7, 28($sp)
+ 465 0494 AFB60018		sw	$s6, 24($sp)
+ 466 0498 AFB50014		sw	$s5, 20($sp)
+ 467 049c AFB40010		sw	$s4, 16($sp)
+ 468 04a0 AFB3000C		sw	$s3, 12($sp)
+ 469 04a4 AFB20008		sw	$s2, 8($sp)
+ 470 04a8 AFB10004		sw	$s1, 4($sp)
+ 471 04ac AFB00000		sw	$s0, 0($sp)
+ 472 04b0               	
+ 473 04b0 8C900000		lw	$s0, 0($a0)						#Rule Number
+ 474 04b4 8C910004		lw	$s1, 4($a0)						#Number of Gens
+ 475 04b8 8C920008		lw	$s2, 8($a0)						#Width
+ 476 04bc 2093000C		addi	$s3, $a0, 12				#Address of line 1
+ 477 04c0 3C140000		la	$s4, life_driver_current_step	#Current Step
+     04c4 36940000
+ 478 04c8 3C150000		la	$s5, life_driver_prev_step		#Prev Step
+     04cc 36B50000
+ 479 04d0 20160000		addi	$s6, $zero, 0				#loop counter
+ 480 04d4 3C170000		la	$s7, life_step_current_step		#current rule step
+     04d8 36F70000
+ 481 04dc               	
+ 482 04dc 20080001		addi	$t0, $zero, 1
+ 483 04e0 11120037		beq	$t0, $s2, life_driver_one_wide	#Special case to prevent errors
+ 484 04e4               	
+ 485 04e4 2008002E		addi	$t0, $zero, 46				#Period is 46
+ 486 04e8 20090000		addi	$t1, $zero, 0
+ 487 04ec               	
+ 488 04ec               life_driver_init_loop:
+ 489 04ec 01355020		add	$t2, $t1, $s5
+ 490 04f0 A1480000		sb	$t0, 0($t2)
+ 491 04f4 01335020		add	$t2, $t1, $s3
+ 492 04f8 814B0000		lb	$t3, 0($t2)
+ 493 04fc 01375020		add	$t2, $t1, $s7
+ 494 0500 A14B0000		sb	$t3, 0($t2)
+ 495 0504 21290001		addi	$t1, $t1, 1
+ 496 0508 1532FFF8		bne	$t1, $s2, life_driver_init_loop
+ 497 050c               	
+ 498 050c               	
+ 499 050c               life_driver_gen_loop:
+ 500 050c 20080000		addi	$t0, $zero, 0				#Line Loop Counter
+ 501 0510               life_driver_line_loop:
+ 502 0510 01174820		add	$t1, $t0, $s7
+ 503 0514 812A0000		lb	$t2, 0($t1)
+ 504 0518 11400015		beq	$t2, $zero, life_driver_line_dead
+ 505 051c 02A84820		add	$t1, $s5, $t0					#current byte, prev gen
+ 506 0520 812B0000		lb	$t3, 0($t1)
+ 507 0524 296B0041		slti	$t3, $t3, 65
+ 508 0528 11600008		beq	$t3, $zero, life_driver_line_alive_again
+ 509 052c               	
+ 510 052c 200A0041		addi	$t2, $zero, 65				#Capital A is 65
+ 511 0530 02885820		add	$t3, $s4, $t0				#current byte, current gen
+ 512 0534 A16A0000		sb	$t2, 0($t3)
+ 513 0538 02A85820		add	$t3, $s5, $t0				#current byte, prev gen
+ 514 053c A16A0000		sb	$t2, 0($t3)
+ 515 0540 21080001		addi	$t0, $t0, 1
+ 516 0544 1512FFF2		bne	$t0, $s2, life_driver_line_loop
+ 517 0548 08000164		j life_driver_line_done
+ 518 054c               	
+ 519 054c               life_driver_line_alive_again:
+ 520 054c 02A84820		add	$t1, $s5, $t0					#current byte, prev gen
+ 521 0550 812A0000		lb	$t2, 0($t1)
+ 522 0554 214A0001		addi	$t2, $t2, 1					
+ 523 0558 A12A0000		sb	$t2, 0($t1)
+ 524 055c 02884820		add	$t1, $s4, $t0					#current byte, current gen
+ 525 0560 A12A0000		sb	$t2, 0($t1)
+ 526 0564 21080001		addi	$t0, $t0, 1
+ 527 0568 1512FFE9		bne	$t0, $s2, life_driver_line_loop
+ 528 056c 08000164		j life_driver_line_done
+ 529 0570               	
+ 530 0570               life_driver_line_dead:
+ 531 0570 200A002E		addi	$t2, $zero, 46				#Period is 46
+ 532 0574 02885820		add	$t3, $s4, $t0				#current byte, current gen
+ 533 0578 A16A0000		sb	$t2, 0($t3)
+ 534 057c 02A85820		add	$t3, $s5, $t0				#current byte, prev gen
+ 535 0580 A16A0000		sb	$t2, 0($t3)
+ 536 0584 21080001		addi	$t0, $t0, 1
+ 537 0588 1512FFE1		bne	$t0, $s2, life_driver_line_loop
+ 538 058c 08000164		j life_driver_line_done
+ 539 0590               
+ 540 0590               life_driver_line_done:
+ 541 0590 22840000		addi	$a0, $s4, 0
+ 542 0594 22C50000		addi	$a1, $s6, 0 
+ 543 0598 22460000		addi	$a2, $s2, 0
+ 544 059c 0C000059		jal	life_print_line
+ 545 05a0 22E40000		addi	$a0, $s7, 0
+ 546 05a4 22050000		addi	$a1, $s0, 0
+ 547 05a8 22460000		addi	$a2, $s2, 0
+ 548 05ac 0C000189		jal life_step
+ 549 05b0 20570000		addi	$s7, $v0, 0
+ 550 05b4 22D60001		addi	$s6, $s6, 1
+ 551 05b8 16D1FFD4		bne	$s6, $s1, life_driver_gen_loop
+ 552 05bc 0800017E		j life_driver_done
+ 553 05c0               	
+ 554 05c0               	
+ 555 05c0               	
+ 556 05c0               life_driver_one_wide:
+ 557 05c0 826A0000		lb	$t2, 0($s3)						
+ 558 05c4 11400006		beq	$t2, $zero, life_driver_one_wide_zero
+ 559 05c8 200A0041		addi	$t2, $zero, 65				#Capital A is 65
+ 560 05cc               life_driver_one_wide_one:
+ 561 05cc A28A0000		sb	$t2, 0($s4)
+ 562 05d0 22940001		addi	$s4, $s4, 1
+ 563 05d4 22B50001		addi	$s5, $s5, 1
+ 564 05d8 12B20007		beq	$s5, $s2, life_driver_done
+ 565 05dc 08000173		j life_driver_one_wide_one
+ 566 05e0               life_driver_one_wide_zero:
+ 567 05e0 200A002E		addi	$t2, $zero, 46				#Period is 46
+ 568 05e4 A28A0000		sb	$t2, 0($s4)
+ 569 05e8 22940001		addi	$s4, $s4, 1
+ 570 05ec 22B50001		addi	$s5, $s5, 1
+ 571 05f0 12B20001		beq	$s5, $s2, life_driver_done
+ 572 05f4 08000178		j life_driver_one_wide_zero
+ 573 05f8               	
+ 574 05f8               	
+ 575 05f8               	
+ 576 05f8               life_driver_done:
+ 577 05f8 8FBF0020		lw 	$ra, 32($sp)			#Func Tear Down
+ 578 05fc 8FB7001C		lw	$s7, 28($sp)
+ 579 0600 8FB60018		lw	$s6, 24($sp)
+ 580 0604 8FB50014		lw	$s5, 20($sp)
+ 581 0608 8FB40010		lw	$s4, 16($sp)
+ 582 060c 8FB3000C		lw	$s3, 12($sp)
+ 583 0610 8FB20008		lw	$s2, 8($sp)
+ 584 0614 8FB10004		lw 	$s1, 4($sp)
+ 585 0618 8FB00000		lw 	$s0, 0($sp)
+ 586 061c 23BD0024		addi 	$sp, $sp, 36   	
+ 587 0620 03E00008		jr 	$ra	
+ 588 0624               
+ 589 0624               
+ 590 0624               
+ 591 0624               # 
+ 592 0624               # Name:		life_step
+ 593 0624               #
+ 594 0624               # Description:	Performs one interation of the game of life, setting the values
+ 595 0624               #			in memory and returning the address of the space used
+ 596 0624               #
+ 597 0624               # Arguments:	a0 Address of the current board state
+ 598 0624               #   		a1 The Rule being used as an int
+ 599 0624               #			a2 Width of the game board
+ 600 0624               # Returns:	v0 Address of the next line
+ 601 0624               #
+ 602 0624               life_step:
+ 603 0624 23BDFFE8		addi	$sp, $sp, -24				#Func Setup
+ 604 0628 AFBF0014		sw	$ra, 20($sp)	
+ 605 062c AFB40010		sw	$s4, 16($sp)
+ 606 0630 AFB3000C		sw	$s3, 12($sp)
+ 607 0634 AFB20008		sw	$s2, 8($sp)
+ 608 0638 AFB10004		sw	$s1, 4($sp)
+ 609 063c AFB00000		sw	$s0, 0($sp)
+ 610 0640               	
+ 611 0640 20900000		addi	$s0, $a0, 0					#Current state address
+ 612 0644 20B10000		addi	$s1, $a1, 0					#Rule number
+ 613 0648 20D20000		addi	$s2, $a2, 0					#Width of the board
+ 614 064c 20130000		addi	$s3, $zero, 0				#Loop Counter
+ 615 0650 3C140000		la	$s4, life_step_current_step		#Next Board State
+     0654 36940000
+ 616 0658               
+ 617 0658 3C080000		la	$t0, life_step_prev_step
+     065c 35080000
+ 618 0660 20090000		addi	$t1, $zero, 0
+ 619 0664               life_step_init:
+ 620 0664 01305820		add	$t3, $t1, $s0
+ 621 0668 816A0000		lb	$t2, 0($t3)
+ 622 066c 01285820		add	$t3, $t1, $t0
+ 623 0670 A16A0000		sb	$t2, 0($t3)
+ 624 0674 21290001		addi	$t1, $t1, 1
+ 625 0678 1532FFFA		bne	$t1, $s2, life_step_init
+ 626 067c 21100000		addi	$s0, $t0, 0
+ 627 0680               	
+ 628 0680               
+ 629 0680               life_step_loop_begin:
+ 630 0680               	
+ 631 0680 22040000		addi	$a0, $s0, 0
+ 632 0684 22650000		addi	$a1, $s3, 0
+ 633 0688 22460000		addi	$a2, $s2, 0
+ 634 068c 0C0001B5		jal	life_rule
+ 635 0690               	
+ 636 0690 20080001		addi	$t0, $zero, 1
+ 637 0694 00484004		sllv	$t0, $t0, $v0			#Shift to corrisponding bit of rule number
+ 638 0698 01114024		and	$t0, $t0, $s1				#Did we live?
+ 639 069c 00484006		srlv	$t0, $t0, $v0			#Shift back to save number normally
+ 640 06a0               	
+ 641 06a0 02934820		add	$t1, $s4, $s3				
+ 642 06a4 A1280000		sb	$t0, 0($t1)					
+ 643 06a8               	
+ 644 06a8 22730001		addi	$s3, $s3, 1
+ 645 06ac 1672FFF4		bne	$s3, $s2, life_step_loop_begin
+ 646 06b0               
+ 647 06b0               life_step_loop_end:	
+ 648 06b0               	
+ 649 06b0 22820000		addi	$v0, $s4, 0
+ 650 06b4 8FBF0014		lw 	$ra, 20($sp)			#Func Tear Down
+ 651 06b8 8FB40010		lw	$s4, 16($sp)
+ 652 06bc 8FB3000C		lw	$s3, 12($sp)
+ 653 06c0 8FB20008		lw	$s2, 8($sp)
+ 654 06c4 8FB10004		lw 	$s1, 4($sp)
+ 655 06c8 8FB00000		lw 	$s0, 0($sp)
+ 656 06cc 23BD0018		addi 	$sp, $sp, 24   	
+ 657 06d0 03E00008		jr	$ra		
+ 658 06d4               	
+ 659 06d4               
+ 660 06d4               # 
+ 661 06d4               # Name:		life_rule
+ 662 06d4               #
+ 663 06d4               # Description:	Determines what life rule to apply to a byte
+ 664 06d4               #
+ 665 06d4               # Arguments:	a0 Pointer to the location of the board
+ 666 06d4               #   		a1 The number of the byte to examine
+ 667 06d4               #			a2 Width of the game board
+ 668 06d4               # Returns:	v0 The rule number as an int
+ 669 06d4               #
+ 670 06d4               life_rule:
+ 671 06d4 23BDFFE8		addi	$sp, $sp, -24				#Func Setup
+ 672 06d8 AFBF0014		sw	$ra, 20($sp)	
+ 673 06dc AFB40010		sw	$s4, 16($sp)
+ 674 06e0 AFB3000C		sw	$s3, 12($sp)
+ 675 06e4 AFB20008		sw	$s2, 8($sp)
+ 676 06e8 AFB10004		sw	$s1, 4($sp)
+ 677 06ec AFB00000		sw	$s0, 0($sp)
+ 678 06f0               	
+ 679 06f0 20900000		addi $s0, $a0, 0			#Board location
+ 680 06f4 20B10000		addi $s1, $a1, 0			#Byte number
+ 681 06f8 20D2FFFF		addi $s2, $a2, -1			#need to adjust to do zero indexed math
+ 682 06fc 02114020		add	$t0, $s0, $s1			#Address of byte to read
+ 683 0700               	
+ 684 0700 1220000C		beq	$s1, $zero, life_rule_zero_case
+ 685 0704 12320017		beq	$s1, $s2, life_rule_max_case
+ 686 0708               
+ 687 0708 8109FFFF		lb	$t1, -1($t0)			#Byte to left
+ 688 070c 29290041		slti	$t1, $t1, 65		# A is 65
+ 689 0710 00094880		sll	$t1, $t1, 2
+ 690 0714               	
+ 691 0714 810A0000		lb	$t2, 0($t0)				#Byte being examined
+ 692 0718 294A0041		slti	$t2, $t2, 65		# A is 65
+ 693 071c 000A5040		sll	$t2, $t2, 1
+ 694 0720               	
+ 695 0720 810B0001		lb	$t3, 1($t0)				#Byte to right
+ 696 0724 296B0041		slti	$t3, $t3, 65		# A is 65
+ 697 0728               	
+ 698 0728 012A1025		or	$v0, $t1, $t2
+ 699 072c 004B1025		or	$v0, $v0, $t3
+ 700 0730               	
+ 701 0730 080001E4		j	life_rule_done
+ 702 0734               	
+ 703 0734               life_rule_zero_case:
+ 704 0734               
+ 705 0734 02126020		add	$t4, $s0, $s2
+ 706 0738 81890000		lb	$t1, 0($t4)				#Byte to left, wrap to end
+ 707 073c 29290041		slti	$t1, $t1, 65		# A is 65
+ 708 0740 00094880		sll	$t1, $t1, 2
+ 709 0744               	
+ 710 0744 810A0000		lb	$t2, 0($t0)				#Byte being examined
+ 711 0748 294A0041		slti	$t2, $t2, 65		# A is 65
+ 712 074c 000A5040		sll	$t2, $t2, 1
+ 713 0750               	
+ 714 0750 810B0001		lb	$t3, 1($t0)				#Byte to right
+ 715 0754 296B0041		slti	$t3, $t3, 65		# A is 65
+ 716 0758               	
+ 717 0758 012A1020		add	$v0, $t1, $t2
+ 718 075c 004B1020		add	$v0, $v0, $t3
+ 719 0760 080001E4		j	life_rule_done
+ 720 0764               	
+ 721 0764               life_rule_max_case:
+ 722 0764               	
+ 723 0764 8109FFFF		lb	$t1, -1($t0)			#Byte to left
+ 724 0768 29290041		slti	$t1, $t1, 65		# A is 65
+ 725 076c 00094880		sll	$t1, $t1, 2
+ 726 0770               	
+ 727 0770 810A0000		lb	$t2, 0($t0)				#Byte being examined
+ 728 0774 294A0041		slti	$t2, $t2, 65		# A is 65
+ 729 0778 000A5040		sll	$t2, $t2, 1
+ 730 077c               	
+ 731 077c 820B0000		lb	$t3, 0($s0)				#Byte to right, wrap to first bit
+ 732 0780 296B0041		slti	$t3, $t3, 65		# A is 65
+ 733 0784               	
+ 734 0784 012A1020		add	$v0, $t1, $t2
+ 735 0788 004B1020		add	$v0, $v0, $t3
+ 736 078c 080001E4		j	life_rule_done
+ 737 0790               	
+ 738 0790               	
+ 739 0790               life_rule_done:
+ 740 0790               	
+ 741 0790 8FBF0014		lw 	$ra, 20($sp)			#Func Tear Down
+ 742 0794 8FB40010		lw	$s4, 16($sp)
+ 743 0798 8FB3000C		lw	$s3, 12($sp)
+ 744 079c 8FB20008		lw	$s2, 8($sp)
+ 745 07a0 8FB10004		lw 	$s1, 4($sp)
+ 746 07a4 8FB00000		lw 	$s0, 0($sp)
+ 747 07a8 23BD0018		addi 	$sp, $sp, 24   	
+ 748 07ac 03E00008		jr	$ra		
+
+
+EXIT                          = 0000000A   
+MAX_GENS                      = 00000019   
+MAX_RULE                      = 000000FF   
+MAX_WIDTH                     = 00000046   
+MEM_ALLOC                     = 00000009   
+PRINT_CHAR                    = 0000000B   
+PRINT_INT                     = 00000001   
+PRINT_STRING                  = 00000004   
+READ_INT                      = 00000005   
+header_1                        00000000 R  data 
+header_2                        0000002B R  data 
+header_3                        00000056 R  data 
+header_4                        00000081 R  data 
+illegal_input                   00000116 R  data 
+invalid_num_gen                 000000B3 R  data 
+invalid_row_size                000000E9 R  data 
+invalid_rule                    00000083 R  data 
+life_driver                     00000488 R  text 
+life_driver_arguments           0000014C R  data 
+life_driver_current_step        000001E4 R  data 
+life_driver_done                000005F8 R  text 
+life_driver_gen_loop            0000050C R  text 
+life_driver_init_loop           000004EC R  text 
+life_driver_line_alive_again    0000054C R  text 
+life_driver_line_dead           00000570 R  text 
+life_driver_line_done           00000590 R  text 
+life_driver_line_loop           00000510 R  text 
+life_driver_one_wide            000005C0 R  text 
+life_driver_one_wide_one        000005CC R  text 
+life_driver_one_wide_zero       000005E0 R  text 
+life_driver_prev_step           0000019E R  data 
+life_print_header               00000224 R  text 
+life_print_line                 00000164 R  text 
+life_print_line_gen_no_space    000001C4 R  text 
+life_print_line_loop_begin      000001DC R  text 
+life_print_scale                0000030C R  text 
+life_print_scale_begin_loop     00000364 R  text 
+life_print_scale_done           000003C0 R  text 
+life_print_scale_plus           000003A4 R  text 
+life_print_scale_zero           00000388 R  text 
+life_rule                       000006D4 R  text 
+life_rule_done                  00000790 R  text 
+life_rule_max_case              00000764 R  text 
+life_rule_zero_case             00000734 R  text 
+life_step                       00000624 R  text 
+life_step_current_step          0000022A R  data 
+life_step_init                  00000664 R  text 
+life_step_loop_begin            00000680 R  text 
+life_step_loop_end              000006B0 R  text 
+life_step_prev_step             00000270 R  data 
+main                            00000000 RG text 
+main_gens_good                  0000008C R  text 
+main_read_values_loop_begin     000000E8 R  text 
+main_read_values_loop_end       00000124 R  text 
+main_rows_good                  000000C4 R  text 
+main_rule_good                  00000054 R  text 
+print_int_as_bin                000003F0 R  text 
+print_int_as_bin_done           00000464 R  text 
+print_int_as_bin_loop_begin     00000424 R  text 
+print_int_as_bin_zero           00000448 R  text 
+read_values_valid               00000110 R  text 
+rule_banner                     00000146 R  data 
